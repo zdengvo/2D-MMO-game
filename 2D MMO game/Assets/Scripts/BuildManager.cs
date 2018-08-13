@@ -2,9 +2,24 @@
 using System.Collections.Generic;
 using UnityEngine;
 using SimpleJSON;
+using UnityEngine.UI;
 
 public class BuildManager : MonoBehaviour
 {
+    //Singleton in unity
+    private static BuildManager instance;
+    public static BuildManager I
+    {
+        get
+        {
+            if(instance == null)
+            {
+                instance = FindObjectOfType<BuildManager>();
+            }
+            return instance;
+        }
+    }
+
     public enum TileTypes
     {
         grass,
@@ -24,7 +39,9 @@ public class BuildManager : MonoBehaviour
     private int map_width;
     private int map_height;
     private int number_of_houses;
-    private int[] mapTiles;
+    private int[] possibleMapTiles;
+    private Dictionary<string, string> tileName;
+    private Dictionary<string, int> houseLevel;
     private int countDiffrentHouses;
 
     [SerializeField]
@@ -32,6 +49,17 @@ public class BuildManager : MonoBehaviour
     private int[,] map;
     [SerializeField]
     private Transform parent;
+    [SerializeField]
+    private TileDisplay displayTile;
+
+    [SerializeField]
+    private Text textCount;
+
+    private void Awake()
+    {
+        tileName = new Dictionary<string, string>();
+        houseLevel = new Dictionary<string, int>();
+    }
 
     IEnumerator Start()
     {
@@ -62,15 +90,23 @@ public class BuildManager : MonoBehaviour
     private void GetRequiredMapTiles(JSONNode jsonObject)
     {
         int numberOfMapTiles = jsonObject["tiles"].AsArray.Count;
-        mapTiles = new int[numberOfMapTiles];
+        possibleMapTiles = new int[numberOfMapTiles];
 
         for (int i = 0; i < numberOfMapTiles; i++)
         {
             string tileType = jsonObject["tiles"][i][0];
-            mapTiles[i] = GetTileNumber(tileType);
 
-            if (tileType.Equals(GetTileName((int)TileTypes.house1)) || tileType.Equals(GetTileName((int)TileTypes.house2)))
+            tileName[tileType] = jsonObject["tiles"][i][1];
+            possibleMapTiles[i] = GetTileNumber(tileType);
+
+            if (tileType.Equals(GetTileType((int)TileTypes.house1)))
             {
+                houseLevel[tileType] = jsonObject["tiles"][i][2];
+                countDiffrentHouses++;
+            }
+            else if (tileType.Equals(GetTileType((int)TileTypes.house2)))
+            {
+                houseLevel[tileType] = jsonObject["tiles"][i][2];
                 countDiffrentHouses++;
             }
         }
@@ -89,7 +125,12 @@ public class BuildManager : MonoBehaviour
             int houseType = Random.Range(0, countDiffrentHouses);
 
             map[x, y] = (houseType == 0) ? GetTileNumber("house1") : GetTileNumber("house2");
-            Instantiate(tiles[map[x, y]], new Vector3(x, y, 0), Quaternion.identity, parent);
+            
+            //Setup and create house tile on map
+            string type = GetTileType(map[x, y]);
+            HouseTile houseTile = new HouseTile(type, tileName[type], houseLevel[type]);
+            displayTile.SetUpTile(houseTile, GetTileSprite(type));
+            Instantiate(displayTile, new Vector3(x, y, 0), Quaternion.identity, parent);
 
             currentHouses++;
         }
@@ -100,7 +141,7 @@ public class BuildManager : MonoBehaviour
         {
             for (int j = 0; j < map_height; j++)
             {
-                int type = Random.Range(0, mapTiles.Length);
+                int type = Random.Range(0, possibleMapTiles.Length);
 
                 if (map[i, j] == GetTileNumber("house1") || map[i, j] == GetTileNumber("house2"))
                 {
@@ -108,19 +149,40 @@ public class BuildManager : MonoBehaviour
                     continue;
                 }
 
-                map[i, j] = mapTiles[type];
+                map[i, j] = possibleMapTiles[type];
             }
         }
 
-        Debug.Log(Time.realtimeSinceStartup + " " + "Finish" + " " + --currentHouses);
+        DisplayNumberOfHouses(--currentHouses);
+
+        //Test - Make each tile of the map interactable according to its type (show name of the tile on tap)
+        //Remove later
+        for (int i = 0; i < 5; i++)
+        {
+            string type = GetTileType(i);
+            Tile houseTile = new Tile(type, tileName[type]);
+            displayTile.SetUpTile(houseTile, GetTileSprite(type));
+            Instantiate(displayTile, new Vector3(i, 1, 0), Quaternion.identity, parent);
+        }
     }
 
-    public int GetTileNumber(string tileName)
+    private Sprite GetTileSprite(string type)
     {
-        return (int)System.Enum.Parse(typeof(TileTypes), tileName);
+        return Resources.Load<Sprite>("map_resources/" + type);
     }
 
-    public string GetTileName(int tileNumber)
+    public void DisplayNumberOfHouses(int count)
+    {
+        textCount.text = count.ToString();
+        Debug.Log(Time.realtimeSinceStartup + " " + "Finish" + " " + count);
+    }
+
+    public int GetTileNumber(string tileType)
+    {
+        return (int)System.Enum.Parse(typeof(TileTypes), tileType);
+    }
+
+    public string GetTileType(int tileNumber)
     {
         return System.Enum.GetName(typeof(TileTypes), tileNumber);
     }
