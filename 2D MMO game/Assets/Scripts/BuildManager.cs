@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System.Text;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using SimpleJSON;
@@ -6,9 +7,9 @@ using UnityEngine.UI;
 
 public class BuildManager : MonoBehaviour
 {
-    //Singleton in unity
+    //Singleton
     private static BuildManager instance;
-    public static BuildManager I
+    public static BuildManager Instance
     {
         get
         {
@@ -19,6 +20,9 @@ public class BuildManager : MonoBehaviour
             return instance;
         }
     }
+
+    public static Canvas previousInfoTile;
+    public static GameObject previousInfoTileOutline;
 
     public enum TileTypes
     {
@@ -36,6 +40,7 @@ public class BuildManager : MonoBehaviour
     private string URL;
     private string json;
 
+    private int[,] map;
     private int map_width;
     private int map_height;
     private int number_of_houses;
@@ -45,20 +50,35 @@ public class BuildManager : MonoBehaviour
     private int countDiffrentHouses;
 
     [SerializeField]
-    private GameObject[] tiles;
-    private int[,] map;
-    [SerializeField]
     private Transform parent;
     [SerializeField]
     private TileDisplay displayTile;
 
     [SerializeField]
     private Text textCount;
+    private int houseCount;
+
+    [SerializeField]
+    private GameObject loadingPanel;
+    [SerializeField]
+    private Text loadingText;
+    private bool isLoadFinished;
+
+    //Test Cheat - delete later
+    private int[] nextHouseXpos;
+    private int[] nextHouseYpos;
 
     private void Awake()
     {
         tileName = new Dictionary<string, string>();
         houseLevel = new Dictionary<string, int>();
+
+        GameManager.Instance.OnHouseCountChanged += OnHouseCountChange;
+        GameManager.Instance.OnCameraMove += DisplayMap;
+
+        isLoadFinished = false;
+        loadingText.text = "Loading";
+        StartCoroutine(LoadingScreen());
     }
 
     IEnumerator Start()
@@ -116,65 +136,135 @@ public class BuildManager : MonoBehaviour
     {
         map = new int[map_width, map_height];
 
+        //Delete later
+        nextHouseXpos = new int[number_of_houses+1];
+        nextHouseYpos = new int[number_of_houses+1];
+
         //Create map houses
         int currentHouses = 0;
         while (currentHouses <= number_of_houses)
         {
-            int x = Random.Range(0, map_width);
-            int y = Random.Range(0, map_height);
-            int houseType = Random.Range(0, countDiffrentHouses);
+            int x = UnityEngine.Random.Range(0, map_width);
+            int y = UnityEngine.Random.Range(0, map_height);
+            int houseType = UnityEngine.Random.Range(0, countDiffrentHouses);
+
+            //Check if there is already house
+            if (map[x, y] == GetTileNumber("house1") || map[x, y] == GetTileNumber("house2"))
+            {
+                continue;
+            }
 
             map[x, y] = (houseType == 0) ? GetTileNumber("house1") : GetTileNumber("house2");
-            
-            //Setup and create house tile on map
-            string type = GetTileType(map[x, y]);
-            HouseTile houseTile = new HouseTile(type, tileName[type], houseLevel[type]);
-            displayTile.SetUpTile(houseTile, GetTileSprite(type));
-            Instantiate(displayTile, new Vector3(x, y, 0), Quaternion.identity, parent);
 
-            currentHouses++;
+            //Delete later
+            nextHouseXpos[currentHouses] = x;
+            nextHouseYpos[currentHouses] = y;
+
+            currentHouses++; 
         }
 
-        currentHouses = 0;
         //Create map tiles
         for (int i = 0; i < map_width; i++)
         {
             for (int j = 0; j < map_height; j++)
             {
-                int type = Random.Range(0, possibleMapTiles.Length);
+                int type = UnityEngine.Random.Range(0, possibleMapTiles.Length);
 
                 if (map[i, j] == GetTileNumber("house1") || map[i, j] == GetTileNumber("house2"))
                 {
-                    currentHouses++;
+                    houseCount++;
                     continue;
+                }
+
+                if (type == GetTileNumber("house1") || type == GetTileNumber("house2"))
+                {
+                    type = 0;
                 }
 
                 map[i, j] = possibleMapTiles[type];
             }
         }
+        OnHouseCountChange();
+        DisplayMap();
+        Debug.Log("Loaded after " + Time.realtimeSinceStartup + " - houses on the map: " + houseCount);
+        isLoadFinished = true;
+        loadingPanel.SetActive(false);
+    }
 
-        DisplayNumberOfHouses(--currentHouses);
+    public void DisplayMap()
+    {
+        float camX = Camera.main.gameObject.transform.position.x;
+        float camY = Camera.main.gameObject.transform.position.y;
+       
+        float xStart = camX - 6;
+        float xEnd = camX + 7;
 
-        //Test - Make each tile of the map interactable according to its type (show name of the tile on tap)
-        //Remove later
-        for (int i = 0; i < 5; i++)
+        float yStart = camY - 9;
+        float yEnd = camY + 10;
+
+        foreach (Transform child in parent)
         {
-            string type = GetTileType(i);
-            Tile houseTile = new Tile(type, tileName[type]);
-            displayTile.SetUpTile(houseTile, GetTileSprite(type));
-            Instantiate(displayTile, new Vector3(i, 1, 0), Quaternion.identity, parent);
+            Destroy(child.gameObject);
+        }
+
+        for (int x = (int)xStart; x < xEnd; x++)
+        {
+            for (int y = (int)yStart; y < yEnd; y++)
+            {
+                if (x < 0 || x > map_width - 1 || y < 0 || y > map_height - 1)
+                {
+                    continue;
+                }
+
+                string type = GetTileType(map[x, y]);
+
+                if (map[x, y] == GetTileNumber("house1") || map[x, y] == GetTileNumber("house2"))
+                {
+                    HouseTile houseTile = new HouseTile(type, tileName[type], houseLevel[type]);
+                    displayTile.SetUpTile(houseTile, GetTileSprite(type));
+                    Instantiate(displayTile, new Vector3(x, y, 0), Quaternion.identity, parent);
+                    continue;
+                }
+
+                Tile tile = new Tile(type, tileName[type]);
+                displayTile.SetUpTile(tile, GetTileSprite(type));
+                Instantiate(displayTile, new Vector3(x, y, 0), Quaternion.identity, parent);
+            }
         }
     }
 
-    private Sprite GetTileSprite(string type)
+    private IEnumerator LoadingScreen()
+    {
+        string s = ".";
+        while (isLoadFinished == false)
+        {
+            loadingText.text += s;
+
+            yield return new WaitForSeconds(0.25f);
+        }
+    }
+
+    public Tile GetDefaultTile()
+    {
+        string type = GetTileType((int)TileTypes.grass);
+        return new Tile(type, tileName[type]);
+    }
+
+    public Sprite GetDefaultTileSprite()
+    {
+        string type = GetTileType((int)TileTypes.grass);
+        return Resources.Load<Sprite>("map_resources/" + type);
+    }
+
+    public Sprite GetTileSprite(string type)
     {
         return Resources.Load<Sprite>("map_resources/" + type);
     }
 
-    public void DisplayNumberOfHouses(int count)
+    public void OnHouseCountChange()
     {
-        textCount.text = count.ToString();
-        Debug.Log(Time.realtimeSinceStartup + " " + "Finish" + " " + count);
+        houseCount--;
+        textCount.text = houseCount.ToString();
     }
 
     public int GetTileNumber(string tileType)
@@ -185,5 +275,30 @@ public class BuildManager : MonoBehaviour
     public string GetTileType(int tileNumber)
     {
         return System.Enum.GetName(typeof(TileTypes), tileNumber);
+    }
+
+    public int[,] GetMap()
+    {
+        return map;
+    }
+
+    public int GetMapWidth()
+    {
+        return map_width;
+    }
+    public int GetMapHeight()
+    {
+        return map_height;
+    }
+
+    //Delete Later
+    public int[] GetAllXpos()
+    {
+        return nextHouseXpos;
+    }
+    //Delete Later
+    public int[] GetAllYpos()
+    {
+        return nextHouseYpos;
     }
 }
