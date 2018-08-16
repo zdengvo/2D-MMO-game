@@ -83,14 +83,14 @@ public class CameraMovement : MonoBehaviour {
     }
     private void ZoomIn()
     {
-        if (Camera.main.orthographicSize > 3)
+        if (Camera.main.orthographicSize > 4)
         {
             Camera.main.orthographicSize -= 1;
         }
     }
     private void ZoomOut()
     {
-        if (Camera.main.orthographicSize < 8)
+        if (Camera.main.orthographicSize < 6)
         {
             Camera.main.orthographicSize += 1;
         }

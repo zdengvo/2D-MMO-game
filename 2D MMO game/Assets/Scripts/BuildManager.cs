@@ -196,11 +196,11 @@ public class BuildManager : MonoBehaviour
         float camX = Camera.main.gameObject.transform.position.x;
         float camY = Camera.main.gameObject.transform.position.y;
        
-        float xStart = camX - 6;
-        float xEnd = camX + 7;
+        float xStart = camX - 3;
+        float xEnd = camX + 4;
 
-        float yStart = camY - 9;
-        float yEnd = camY + 10;
+        float yStart = camY - 5;
+        float yEnd = camY + 6;
 
         foreach (Transform child in parent)
         {
