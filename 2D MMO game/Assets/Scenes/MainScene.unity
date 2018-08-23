@@ -549,7 +549,7 @@ Camera:
   m_Enabled: 1
   serializedVersion: 2
   m_ClearFlags: 2
-  m_BackGroundColor: {r: 0.19215687, g: 0.3019608, b: 0.4745098, a: 0}
+  m_BackGroundColor: {r: 0.5372549, g: 0.09803922, b: 0.6039216, a: 0}
   m_NormalizedViewPortRect:
     serializedVersion: 2
     x: 0
@@ -623,7 +623,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 1}
   m_AnchorMax: {x: 0.5, y: 1}
-  m_AnchoredPosition: {x: 0.11001, y: -20.9}
+  m_AnchoredPosition: {x: 0.11001, y: -20.900024}
   m_SizeDelta: {x: 374.78, y: 29.4}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &520267140
@@ -1140,10 +1140,10 @@ RectTransform:
   m_Father: {fileID: 1960774732}
   m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
-  m_AnchorMin: {x: 0, y: 0}
-  m_AnchorMax: {x: 1, y: 1}
-  m_AnchoredPosition: {x: 0, y: 0}
-  m_SizeDelta: {x: 0, y: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 34.3, y: 0}
+  m_SizeDelta: {x: 300, y: 106}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1159944881
 MonoBehaviour:
@@ -1171,7 +1171,7 @@ MonoBehaviour:
     m_BestFit: 0
     m_MinSize: 0
     m_MaxSize: 300
-    m_Alignment: 4
+    m_Alignment: 3
     m_AlignByGeometry: 0
     m_RichText: 1
     m_HorizontalOverflow: 0
@@ -1218,7 +1218,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 1, y: 0.5}
   m_AnchorMax: {x: 1, y: 0.5}
-  m_AnchoredPosition: {x: -17.199997, y: 0}
+  m_AnchoredPosition: {x: -17.200195, y: 0}
   m_SizeDelta: {x: 34.4, y: 100}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1160516858
@@ -1892,7 +1892,7 @@ MonoBehaviour:
   m_ScaleFactor: 1
   m_ReferenceResolution: {x: 800, y: 600}
   m_ScreenMatchMode: 0
-  m_MatchWidthOrHeight: 1
+  m_MatchWidthOrHeight: 0.88
   m_PhysicalUnit: 3
   m_FallbackScreenDPI: 96
   m_DefaultSpriteDPI: 96
@@ -2013,8 +2013,8 @@ MonoBehaviour:
       m_Calls: []
     m_TypeName: UnityEngine.UI.MaskableGraphic+CullStateChangedEvent, UnityEngine.UI,
       Version=1.0.0.0, Culture=neutral, PublicKeyToken=null
-  m_Sprite: {fileID: 10907, guid: 0000000000000000f000000000000000, type: 0}
-  m_Type: 1
+  m_Sprite: {fileID: 21300000, guid: f4297ef1ad2d5a149b2efbb7f81e562d, type: 3}
+  m_Type: 0
   m_PreserveAspect: 0
   m_FillCenter: 1
   m_FillMethod: 4
@@ -2132,7 +2132,7 @@ MonoBehaviour:
   parent: {fileID: 719063540}
   displayTile: {fileID: 805232870}
   textCount: {fileID: 2045547155}
-  loadingPanel: {fileID: 1960774731}
+  loadingPanel: {fileID: 1960774733}
   loadingText: {fileID: 1159944881}
 --- !u!4 &2079465896
 Transform:

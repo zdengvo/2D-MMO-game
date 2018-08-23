@@ -42,7 +42,7 @@ public class TileDisplay : MonoBehaviour {
         textLevel.gameObject.SetActive(state);
         demolishButton.gameObject.SetActive(state);
     }
-
+    
     private void OnMouseDown()
     {
         if (IsPointerOverUIObject())

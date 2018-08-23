@@ -43,56 +43,62 @@ public class CameraMovement : MonoBehaviour {
 
     private void MoveLeft()
     {
-        if (CheckForMapLimit("left"))
+        if (CheckForMapLimit("Left"))
         {
             return;
         }
 
+        GameManager.Instance.OnCameraMove("Left");
         Camera.main.gameObject.transform.position = new Vector3(cam.position.x - 1, cam.position.y, cam.position.z);
-        GameManager.Instance.OnCameraMove();
+        GameManager.Instance.OnCameraMoveClear("Right");
     }
     private void MoveRight()
     {
-        if (CheckForMapLimit("right"))
+        if (CheckForMapLimit("Right"))
         {
             return;
         }
 
+        GameManager.Instance.OnCameraMove("Right");
         Camera.main.gameObject.transform.position = new Vector3(cam.position.x + 1, cam.position.y, cam.position.z);
-        GameManager.Instance.OnCameraMove();
+        GameManager.Instance.OnCameraMoveClear("Left");
     }
     private void MoveUp()
     {
-        if (CheckForMapLimit("top"))
+        if (CheckForMapLimit("Top"))
         {
             return;
         }
 
+        GameManager.Instance.OnCameraMove("Up");
         Camera.main.gameObject.transform.position = new Vector3(cam.position.x, cam.position.y + 1, cam.position.z);
-        GameManager.Instance.OnCameraMove();
+        GameManager.Instance.OnCameraMoveClear("Down");
     }
     private void MoveDown()
     {
-        if (CheckForMapLimit("bottom"))
+        if (CheckForMapLimit("Bottom"))
         {
             return;
         }
 
+        GameManager.Instance.OnCameraMove("Down");
         Camera.main.gameObject.transform.position = new Vector3(cam.position.x, cam.position.y - 1, cam.position.z);
-        GameManager.Instance.OnCameraMove();
+        GameManager.Instance.OnCameraMoveClear("Up");
     }
     private void ZoomIn()
     {
-        if (Camera.main.orthographicSize > 4)
+        if (Camera.main.orthographicSize > 3)
         {
-            Camera.main.orthographicSize -= 1;
+            Camera.main.orthographicSize -= 2;
+            GameManager.Instance.OnCameraMove("ZoomIn");
         }
     }
     private void ZoomOut()
     {
-        if (Camera.main.orthographicSize < 6)
+        if (Camera.main.orthographicSize < 9)
         {
-            Camera.main.orthographicSize += 1;
+            Camera.main.orthographicSize += 2;
+            GameManager.Instance.OnCameraMove("ZoomOut");
         }
     }
     private bool CheckForMapLimit(string side)
@@ -103,16 +109,16 @@ public class CameraMovement : MonoBehaviour {
 
         switch (side)
         {
-            case "left":
+            case "Left":
                 if (camX < camSize - 1) return true;
                 break;
-            case "right":
+            case "Right":
                 if (camX > BuildManager.Instance.GetMapWidth() - camSize) return true;
                 break;
-            case "top":
+            case "Top":
                 if (camY > BuildManager.Instance.GetMapHeight() - camSize) return true;
                 break;
-            case "bottom":
+            case "Bottom":
                 if (camY < camSize - 1) return true;
                 break;
         }
@@ -122,13 +128,13 @@ public class CameraMovement : MonoBehaviour {
     //Delete Later
     private void MoveCameraToNextHouse()
     {
-        if (nextHouse < 5)
+        if (nextHouse < BuildManager.Instance.GetAllXpos().Length)
         {
-            int x = BuildManager.Instance.GetAllXpos()[nextHouse];
-            int y = BuildManager.Instance.GetAllYpos()[nextHouse];
-            Camera.main.gameObject.transform.position = new Vector3(x, y, cam.position.z);
+            float x = BuildManager.Instance.GetAllXpos()[nextHouse];
+            float y = BuildManager.Instance.GetAllYpos()[nextHouse];
+            Camera.main.gameObject.transform.position = new Vector3(x-0.5f, y-0.5f, cam.position.z);
             nextHouse++;
-            GameManager.Instance.OnCameraMove();
+            GameManager.Instance.OnCameraMove("default");
         }
         else
         {

@@ -13,7 +13,7 @@ public class BuildManager : MonoBehaviour
     {
         get
         {
-            if(instance == null)
+            if (instance == null)
             {
                 instance = FindObjectOfType<BuildManager>();
             }
@@ -23,6 +23,10 @@ public class BuildManager : MonoBehaviour
 
     public static Canvas previousInfoTile;
     public static GameObject previousInfoTileOutline;
+
+    //For ZoomOut optimisation
+    private static float previousHeight;
+    private static float previousWidth;
 
     public enum TileTypes
     {
@@ -34,7 +38,7 @@ public class BuildManager : MonoBehaviour
         house1,
         house2,
         count
-    } 
+    }
 
     [SerializeField]
     private string URL;
@@ -59,10 +63,9 @@ public class BuildManager : MonoBehaviour
     private int houseCount;
 
     [SerializeField]
-    private GameObject loadingPanel;
+    private Image loadingPanel;
     [SerializeField]
     private Text loadingText;
-    private bool isLoadFinished;
 
     //Test Cheat - delete later
     private int[] nextHouseXpos;
@@ -75,13 +78,34 @@ public class BuildManager : MonoBehaviour
 
         GameManager.Instance.OnHouseCountChanged += OnHouseCountChange;
         GameManager.Instance.OnCameraMove += DisplayMap;
+        GameManager.Instance.OnCameraMoveClear += OnCameraMoveClear;
 
-        isLoadFinished = false;
+        //Set up for ZoomOut display
+        Camera cam = Camera.main;
+        previousHeight = 2f * cam.orthographicSize;
+        previousWidth = previousHeight * cam.aspect;
+
         loadingText.text = "Loading";
         StartCoroutine(LoadingScreen());
     }
 
-    IEnumerator Start()
+    void Start()
+    {
+        if (Application.internetReachability == NetworkReachability.NotReachable)
+        {
+            //Offline version
+            TextAsset offlineJSON = Resources.Load<TextAsset>("offlineJSON");
+            json = offlineJSON.text;
+
+            Initialization();
+        }
+        else
+        {
+            StartCoroutine(LoadJSON());
+        }
+    }
+
+    IEnumerator LoadJSON()
     {
         //Load JSON
         using (WWW www = new WWW(URL))
@@ -93,11 +117,12 @@ public class BuildManager : MonoBehaviour
 
         Initialization();
     }
+
     private void Initialization()
     {
         //Parse JSON
         JSONNode jsonObject = JSON.Parse(json);
-        
+
         map_width = jsonObject["map_width"].AsInt;
         map_height = jsonObject["map_height"].AsInt;
         number_of_houses = jsonObject["number_of_houses"].AsInt;
@@ -137,18 +162,18 @@ public class BuildManager : MonoBehaviour
         map = new int[map_width, map_height];
 
         //Delete later
-        nextHouseXpos = new int[number_of_houses+1];
-        nextHouseYpos = new int[number_of_houses+1];
+        nextHouseXpos = new int[number_of_houses];
+        nextHouseYpos = new int[number_of_houses];
 
         //Create map houses
         int currentHouses = 0;
-        while (currentHouses <= number_of_houses)
+        while (currentHouses < number_of_houses)
         {
-            int x = UnityEngine.Random.Range(0, map_width);
-            int y = UnityEngine.Random.Range(0, map_height);
+            int x = UnityEngine.Random.Range(225, map_width - 225);
+            int y = UnityEngine.Random.Range(225, map_height - 225);
             int houseType = UnityEngine.Random.Range(0, countDiffrentHouses);
 
-            //Check if there is already house
+            //Check if there is already a house
             if (map[x, y] == GetTileNumber("house1") || map[x, y] == GetTileNumber("house2"))
             {
                 continue;
@@ -160,7 +185,7 @@ public class BuildManager : MonoBehaviour
             nextHouseXpos[currentHouses] = x;
             nextHouseYpos[currentHouses] = y;
 
-            currentHouses++; 
+            currentHouses++;
         }
 
         //Create map tiles
@@ -184,29 +209,203 @@ public class BuildManager : MonoBehaviour
                 map[i, j] = possibleMapTiles[type];
             }
         }
-        OnHouseCountChange();
-        DisplayMap();
+        textCount.text = houseCount.ToString();
+        DisplayMap("default");
         Debug.Log("Loaded after " + Time.realtimeSinceStartup + " - houses on the map: " + houseCount);
-        isLoadFinished = true;
-        loadingPanel.SetActive(false);
+        StartCoroutine(FadeIn());
     }
 
-    public void DisplayMap()
+    public void DisplayMap(string action)
     {
-        float camX = Camera.main.gameObject.transform.position.x;
-        float camY = Camera.main.gameObject.transform.position.y;
-       
-        float xStart = camX - 3;
-        float xEnd = camX + 4;
+        Camera cam = Camera.main;
+        float height = 2f * cam.orthographicSize;
+        float width = height * cam.aspect;
 
-        float yStart = camY - 5;
-        float yEnd = camY + 6;
+        float camX = cam.gameObject.transform.position.x;
+        float camY = cam.gameObject.transform.position.y;
+
+        float xStart = camX - width / 2 + 1;
+        float xEnd = camX + width / 2;
+
+        float yStart = camY - height / 2 + 1;
+        float yEnd = camY + height / 2;
+
+        switch (action)
+        {
+            case "Left":
+                MoveCameraLeft(xStart, yStart, yEnd);
+                break;
+            case "Right":
+                MoveCameraRight(xEnd, yStart, yEnd);
+                break;
+            case "Up":
+                MoveCameraUp(yEnd, xStart, xEnd);
+                break;
+            case "Down":
+                MoveCameraDown(yStart, xStart, xEnd);
+                break;
+            case "ZoomIn":
+                CameraZoomIn();
+                break;
+            case "ZoomOut":
+                CameraZoomOut(xStart, xEnd, yStart, yEnd);
+                break;
+            default: CameraOnLoad(xStart, xEnd, yStart, yEnd);
+                break;
+        }
+    }
+
+    #region Optimisation
+
+    private void MoveCameraLeft(float tempX_Y, float yStart, float yEnd)
+    {
+        int x = (int)tempX_Y - 1;
+
+        for (int y = (int)yStart; y < yEnd; y++)
+        {
+            if (x < 0 || x > map_width - 1 || y < 0 || y > map_height - 1)
+            {
+                continue;
+            }
+
+            string type = GetTileType(map[x, y]);
+
+            if (map[x, y] == GetTileNumber("house1") || map[x, y] == GetTileNumber("house2"))
+            {
+                CreateHouse(type, x, y);
+                continue;
+            }
+
+            CreateTile(type, x , y);
+        }
+    }
+
+    private void MoveCameraRight(float tempX_Y, float yStart, float yEnd)
+    {
+        int x = (int)tempX_Y + 1;
+
+        for (int y = (int)yStart; y < yEnd; y++)
+        {
+            if (x < 0 || x > map_width - 1 || y < 0 || y > map_height - 1)
+            {
+                continue;
+            }
+
+            string type = GetTileType(map[x, y]);
+
+            if (map[x, y] == GetTileNumber("house1") || map[x, y] == GetTileNumber("house2"))
+            {
+                CreateHouse(type, x, y);
+                continue;
+            }
+
+            CreateTile(type, x, y);
+        }
+    }
+
+    private void MoveCameraUp(float tempX_Y, float xStart, float xEnd)
+    {
+        int y = (int)tempX_Y + 1;
+
+        for (int x = (int)xStart; x < xEnd; x++)
+        {
+            if (x < 0 || x > map_width - 1 || y < 0 || y > map_height - 1)
+            {
+                continue;
+            }
+
+            string type = GetTileType(map[x, y]);
+
+            if (map[x, y] == GetTileNumber("house1") || map[x, y] == GetTileNumber("house2"))
+            {
+                CreateHouse(type, x, y);
+                continue;
+            }
+
+            CreateTile(type, x, y);
+        }
+    }
+
+    private void MoveCameraDown(float tempX_Y, float xStart, float xEnd)
+    {
+        int y = (int)tempX_Y - 1;
+
+        for (int x = (int)xStart; x < xEnd; x++)
+        {
+            if (x < 0 || x > map_width - 1 || y < 0 || y > map_height - 1)
+            {
+                continue;
+            }
+
+            string type = GetTileType(map[x, y]);
+
+            if (map[x, y] == GetTileNumber("house1") || map[x, y] == GetTileNumber("house2"))
+            {
+                CreateHouse(type, x, y);
+                continue;
+            }
+
+            CreateTile(type, x, y);
+        }
+    }
+
+    private void CameraZoomIn()
+    {
+        //Set up previous camera borders
+        float[] borders = PreviousCameraBorders();
 
         foreach (Transform child in parent)
         {
-            Destroy(child.gameObject);
+            int x = (int)child.position.x;
+            int y = (int)child.position.y;
+            if (x < borders[0] || x > borders[1] || y < borders[2] || y > borders[3])
+            {
+                Destroy(child.gameObject);
+            }
         }
 
+        Camera cam = Camera.main;
+        previousHeight = 2f * cam.orthographicSize;
+        previousWidth = previousHeight * cam.aspect;
+    }
+
+    private void CameraZoomOut(float xStart, float xEnd, float yStart, float yEnd)
+    {
+        //Set up previous camera borders
+        float[] borders = PreviousCameraBorders();
+
+        for (int x = (int)xStart; x < xEnd; x++)
+        {
+            for (int y = (int)yStart; y < yEnd; y++)
+            {
+                if (x < 0 || x > map_width - 1 || y < 0 || y > map_height - 1)
+                {
+                    continue;
+                }
+
+                //Display only new tiles
+                if (x < borders[0] || x > borders[1] || y < borders[2] || y > borders[3])
+                {
+                    string type = GetTileType(map[x, y]);
+
+                    if (map[x, y] == GetTileNumber("house1") || map[x, y] == GetTileNumber("house2"))
+                    {
+                        CreateHouse(type, x, y);
+                        continue;
+                    }
+
+                    CreateTile(type, x, y);
+                }
+            }
+        }
+
+        Camera cam = Camera.main;
+        previousHeight = 2f * cam.orthographicSize;
+        previousWidth = previousHeight * cam.aspect;
+    }
+
+    private void CameraOnLoad(float xStart, float xEnd, float yStart, float yEnd)
+    {
         for (int x = (int)xStart; x < xEnd; x++)
         {
             for (int y = (int)yStart; y < yEnd; y++)
@@ -220,28 +419,172 @@ public class BuildManager : MonoBehaviour
 
                 if (map[x, y] == GetTileNumber("house1") || map[x, y] == GetTileNumber("house2"))
                 {
-                    HouseTile houseTile = new HouseTile(type, tileName[type], houseLevel[type]);
-                    displayTile.SetUpTile(houseTile, GetTileSprite(type));
-                    Instantiate(displayTile, new Vector3(x, y, 0), Quaternion.identity, parent);
+                    CreateHouse(type, x, y);
                     continue;
                 }
 
-                Tile tile = new Tile(type, tileName[type]);
-                displayTile.SetUpTile(tile, GetTileSprite(type));
-                Instantiate(displayTile, new Vector3(x, y, 0), Quaternion.identity, parent);
+                CreateTile(type, x, y);
             }
         }
+    }
+
+    private void OnCameraMoveClear(string side)
+    {
+        Camera cam = Camera.main;
+        float height = 2f * cam.orthographicSize;
+        float width = height * cam.aspect;
+
+        float camX = cam.gameObject.transform.position.x;
+        float camY = cam.gameObject.transform.position.y;
+
+        float xStart = camX - width / 2 + 1;
+        float xEnd = camX + width / 2;
+
+        float yStart = camY - height / 2 + 1;
+        float yEnd = camY + height / 2;
+
+        switch (side)
+        {
+            case "Left":
+                ClearLeft(xStart, yStart, yEnd);
+                break;
+            case "Right":
+                ClearRight(xEnd, yStart, yEnd);
+                break;
+            case "Up":
+                ClearUp(yEnd, xStart, xEnd);
+                break;
+            case "Down":
+                ClearDown(yStart, xStart, xEnd);
+                break;
+            default:
+                break;
+        }
+    }
+
+    private void ClearLeft(float tempX_Y, float yStart, float yEnd)
+    {
+        int x = (int)tempX_Y - 1;
+
+        //Optimise better if needed (destroy previously saved objects - cam left border)
+        foreach (Transform child in parent)
+        {
+            if (child.position.x <= x)
+            {
+                Destroy(child.gameObject);
+            }
+        }
+    }
+
+    private void ClearRight(float tempX_Y, float yStart, float yEnd)
+    {
+        int x = (int)tempX_Y + 1;
+
+        //Optimise better if needed (destroy previously saved objects - cam right border)
+        foreach (Transform child in parent)
+        {
+            if (child.position.x >= x)
+            {
+                Destroy(child.gameObject);
+            }
+        }
+    }
+
+    private void ClearUp(float tempX_Y, float xStart, float xEnd)
+    {
+        int y = (int)tempX_Y + 1;
+
+        //Optimise better if needed (destroy previously saved objects - cam top border)
+        foreach (Transform child in parent)
+        {
+            if (child.position.y >= y)
+            {
+                Destroy(child.gameObject);
+            }
+        }
+    }
+
+    private void ClearDown(float tempX_Y, float xStart, float xEnd)
+    {
+        int y = (int)tempX_Y - 1;
+
+        //Optimise better if needed (destroy previously saved objects - cam bottom border)
+        foreach (Transform child in parent)
+        {
+            if (child.position.y <= y)
+            {
+                Destroy(child.gameObject);
+            }
+        }
+    }
+
+    #endregion
+
+    private float[] PreviousCameraBorders()
+    {
+        Camera cam = Camera.main;
+        float camX = cam.gameObject.transform.position.x;
+        float camY = cam.gameObject.transform.position.y;
+
+        float previousXStart = camX - previousWidth / 2 + 1;
+        float previousXEnd = camX + previousWidth / 2;
+
+        float previousYStart = camY - previousHeight / 2 + 1;
+        float previousYEnd = camY + previousHeight / 2;
+
+        float[] borders = new float[4];
+        borders[0] = previousXStart;
+        borders[1] = previousXEnd;
+        borders[2] = previousYStart;
+        borders[3] = previousYEnd;
+
+        return borders;
+    }
+
+    private void CreateHouse(string type, int x, int y)
+    {
+        HouseTile houseTile = new HouseTile(type, tileName[type], houseLevel[type]);
+        displayTile.SetUpTile(houseTile, GetTileSprite(type));
+        Instantiate(displayTile, new Vector3(x, y, 0), Quaternion.identity, parent);
+    }
+
+    private void CreateTile(string type, int x, int y)
+    {
+        Tile tile = new Tile(type, tileName[type]);
+        displayTile.SetUpTile(tile, GetTileSprite(type));
+        Instantiate(displayTile, new Vector3(x, y, 0), Quaternion.identity, parent);
     }
 
     private IEnumerator LoadingScreen()
     {
         string s = ".";
-        while (isLoadFinished == false)
+        while (true)
         {
             loadingText.text += s;
 
-            yield return new WaitForSeconds(0.25f);
+            yield return new WaitForSeconds(0.5f);
+
+            if (loadingText.text.Contains("..."))
+            {
+                loadingText.text = "Loading";
+            }
         }
+    }
+
+    private IEnumerator FadeIn()
+    {
+        yield return new WaitForSeconds(1);
+
+        float t = 1f;
+        while (t > 0)
+        {
+            t -= Time.deltaTime;
+            loadingPanel.color = new Color(0f, 0f, 0f, t);
+            loadingText.color = new Color(0f, 0f, 0f, t);
+            yield return 0;
+        }
+
+        loadingPanel.gameObject.SetActive(false);
     }
 
     public Tile GetDefaultTile()
@@ -265,6 +608,11 @@ public class BuildManager : MonoBehaviour
     {
         houseCount--;
         textCount.text = houseCount.ToString();
+
+        if (houseCount <= 0)
+        {
+            GameManager.Instance.GameOver();
+        }
     }
 
     public int GetTileNumber(string tileType)

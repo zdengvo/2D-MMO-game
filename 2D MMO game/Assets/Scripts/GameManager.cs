@@ -19,5 +19,12 @@ public class GameManager : MonoBehaviour {
     }
 
     public Action OnHouseCountChanged;
-    public Action OnCameraMove;
+    public Action<string> OnCameraMove;
+    public Action<string> OnCameraMoveClear;
+
+    public void GameOver()
+    {
+        Debug.Log("Game Over");
+        Application.Quit();
+    }
 }
